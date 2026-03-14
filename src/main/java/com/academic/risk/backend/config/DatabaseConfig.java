@@ -22,12 +22,15 @@ public class DatabaseConfig {
                 environment.getProperty("SPRING_DATASOURCE_URL"),
                 environment.getProperty("DATABASE_URL"),
                 environment.getProperty("JDBC_DATABASE_URL"),
+                buildPostgresUrlFromParts(environment),
                 environment.getProperty("spring.datasource.url")
         );
 
         String username = firstNonBlank(
                 environment.getProperty("SPRING_DATASOURCE_USERNAME"),
                 environment.getProperty("DATABASE_USERNAME"),
+                environment.getProperty("PGUSER"),
+                environment.getProperty("POSTGRES_USER"),
                 environment.getProperty("spring.datasource.username"),
                 DEFAULT_LOCAL_MYSQL_USERNAME
         );
@@ -35,6 +38,8 @@ public class DatabaseConfig {
         String password = firstNonBlank(
                 environment.getProperty("SPRING_DATASOURCE_PASSWORD"),
                 environment.getProperty("DATABASE_PASSWORD"),
+                environment.getProperty("PGPASSWORD"),
+                environment.getProperty("POSTGRES_PASSWORD"),
                 environment.getProperty("spring.datasource.password"),
                 DEFAULT_LOCAL_MYSQL_PASSWORD
         );
@@ -70,9 +75,31 @@ public class DatabaseConfig {
         return trimmedUrl;
     }
 
+    private String buildPostgresUrlFromParts(Environment environment) {
+        String host = firstNonBlank(
+                environment.getProperty("PGHOST"),
+                environment.getProperty("POSTGRES_HOST")
+        );
+        String port = firstNonBlank(
+                environment.getProperty("PGPORT"),
+                environment.getProperty("POSTGRES_PORT"),
+                "5432"
+        );
+        String database = firstNonBlank(
+                environment.getProperty("PGDATABASE"),
+                environment.getProperty("POSTGRES_DB")
+        );
+
+        if (isBlank(host) || isBlank(database)) {
+            return null;
+        }
+
+        return "jdbc:postgresql://" + host.trim() + ":" + port.trim() + "/" + database.trim();
+    }
+
     private String firstNonBlank(String... values) {
         for (String value : values) {
-            if (!isBlank(value)) {
+            if (!isBlank(value) && !value.trim().startsWith("${")) {
                 return value.trim();
             }
         }
