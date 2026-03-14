@@ -42,3 +42,4 @@ If you are using Render PostgreSQL, set:
 - `SPRING_DATASOURCE_PASSWORD=YOUR_PASSWORD`
 
 Do not enter `${SPRING_DATASOURCE_URL}` as the value in Render. Enter the real JDBC URL.
+The backend also accepts `postgresql://...`, `postgres://...`, and the earlier mistaken `http:postgresql://...` forms and normalizes them automatically at startup.
