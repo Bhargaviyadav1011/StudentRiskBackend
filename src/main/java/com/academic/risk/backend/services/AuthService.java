@@ -45,11 +45,13 @@ public class AuthService {
     private AuthenticationManager authenticationManager;
 
     public AuthResponse login(LoginRequest request) {
+        String username = request.getUsername() == null ? null : request.getUsername().trim();
+        request.setUsername(username);
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(username, request.getPassword())
         );
-        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-        User user = userRepository.findByUsername(request.getUsername()).orElseThrow();
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        User user = userRepository.findByUsername(username).orElseThrow();
         ensureRoleProfileExists(user);
 
         if (request.getRole() != null && !user.getRole().name().equalsIgnoreCase(request.getRole())) {
@@ -61,13 +63,20 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+        String username = request.getUsername() == null ? null : request.getUsername().trim();
+        if (username == null || username.isBlank()) {
+            throw new RuntimeException("Username is required.");
+        }
+
+        request.setUsername(username);
+
+        if (userRepository.findByUsername(username).isPresent()) {
             throw new RuntimeException("Username already exists");
         }
 
         try {
             User user = new User();
-            user.setUsername(request.getUsername());
+            user.setUsername(username);
             user.setPassword(passwordEncoder.encode(request.getPassword()));
             user.setRole(User.Role.valueOf(request.getRole().toUpperCase()));
             userRepository.save(user);
