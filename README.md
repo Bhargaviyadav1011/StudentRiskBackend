@@ -16,6 +16,8 @@ Build command:
 Start command:
 `java -jar target/backend-1.0.0.jar`
 
+If Render is configured as a Docker service, this repo now includes a `Dockerfile` and can be deployed directly without custom build/start commands.
+
 ## Required environment variables
 
 - `SPRING_DATASOURCE_URL`
