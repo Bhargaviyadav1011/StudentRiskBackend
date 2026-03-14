@@ -2,6 +2,7 @@ package com.academic.risk.backend.config;
 
 import javax.sql.DataSource;
 
+import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -57,6 +58,25 @@ public class DatabaseConfig {
                 .build();
     }
 
+    @Bean
+    public HibernatePropertiesCustomizer hibernatePropertiesCustomizer(Environment environment) {
+        return properties -> {
+            String rawUrl = firstNonBlank(
+                    environment.getProperty("SPRING_DATASOURCE_URL"),
+                    environment.getProperty("DATABASE_URL"),
+                    environment.getProperty("JDBC_DATABASE_URL"),
+                    buildPostgresUrlFromParts(environment),
+                    environment.getProperty("spring.datasource.url")
+            );
+            String jdbcUrl = normalizeJdbcUrl(rawUrl);
+            if (jdbcUrl.startsWith("jdbc:postgresql:")) {
+                properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+            } else {
+                properties.putIfAbsent("hibernate.dialect", "org.hibernate.dialect.MySQLDialect");
+            }
+        };
+    }
+
     private String normalizeJdbcUrl(String rawUrl) {
         if (isBlank(rawUrl) || rawUrl.startsWith("${")) {
             return DEFAULT_LOCAL_MYSQL_URL;
@@ -70,6 +90,10 @@ public class DatabaseConfig {
             trimmedUrl = "jdbc:" + trimmedUrl;
         } else if (trimmedUrl.startsWith("postgres://")) {
             trimmedUrl = "jdbc:postgresql://" + trimmedUrl.substring("postgres://".length());
+        }
+
+        if (trimmedUrl.startsWith("jdbc:postgresql://") && !containsQueryParameter(trimmedUrl, "sslmode")) {
+            trimmedUrl = trimmedUrl + (trimmedUrl.contains("?") ? "&" : "?") + "sslmode=require";
         }
 
         return trimmedUrl;
@@ -108,5 +132,21 @@ public class DatabaseConfig {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private boolean containsQueryParameter(String url, String parameterName) {
+        int queryStart = url.indexOf('?');
+        if (queryStart < 0 || queryStart == url.length() - 1) {
+            return false;
+        }
+
+        String[] parameters = url.substring(queryStart + 1).split("&");
+        for (String parameter : parameters) {
+            if (parameter.equalsIgnoreCase(parameterName)
+                    || parameter.toLowerCase().startsWith(parameterName.toLowerCase() + "=")) {
+                return true;
+            }
+        }
+        return false;
     }
 }
