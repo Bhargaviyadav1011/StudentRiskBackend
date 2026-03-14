@@ -12,11 +12,13 @@ import com.academic.risk.backend.repositories.UserRepository;
 import com.academic.risk.backend.security.JwtUtil;
 import com.academic.risk.backend.security.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -57,37 +59,43 @@ public class AuthService {
         return new AuthResponse(token, user.getUsername(), user.getRole().name());
     }
 
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
             throw new RuntimeException("Username already exists");
         }
 
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(User.Role.valueOf(request.getRole().toUpperCase()));
-        userRepository.save(user);
+        try {
+            User user = new User();
+            user.setUsername(request.getUsername());
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            user.setRole(User.Role.valueOf(request.getRole().toUpperCase()));
+            userRepository.save(user);
 
-        // If STUDENT role, create a StudentProfile
-        if (user.getRole() == User.Role.STUDENT) {
-            StudentProfile profile = new StudentProfile();
-            profile.setUser(user);
-            profile.setRollNumber(request.getRollNumber() != null ? request.getRollNumber() : "N/A");
-            profile.setDepartment(request.getDepartment() != null ? request.getDepartment() : "General");
-            profile.setCurrentSemester(request.getCurrentSemester() > 0 ? request.getCurrentSemester() : 1);
-            studentProfileRepository.save(profile);
-        } else if (user.getRole() == User.Role.FACULTY) {
-            FacultyProfile fProfile = new FacultyProfile();
-            fProfile.setUser(user);
-            fProfile.setSubject(null);
-            fProfile.setDepartment(request.getDepartment() != null ? request.getDepartment() : "General Department");
-            fProfile.setDesignation(request.getDesignation() != null ? request.getDesignation() : "Professor");
-            facultyProfileRepository.save(fProfile);
+            if (user.getRole() == User.Role.STUDENT) {
+                StudentProfile profile = new StudentProfile();
+                profile.setUser(user);
+                profile.setRollNumber(request.getRollNumber() != null ? request.getRollNumber() : "N/A");
+                profile.setDepartment(request.getDepartment() != null ? request.getDepartment() : "General");
+                profile.setCurrentSemester(request.getCurrentSemester() > 0 ? request.getCurrentSemester() : 1);
+                studentProfileRepository.save(profile);
+            } else if (user.getRole() == User.Role.FACULTY) {
+                FacultyProfile fProfile = new FacultyProfile();
+                fProfile.setUser(user);
+                fProfile.setSubject(null);
+                fProfile.setDepartment(request.getDepartment() != null ? request.getDepartment() : "General Department");
+                fProfile.setDesignation(request.getDesignation() != null ? request.getDesignation() : "Professor");
+                facultyProfileRepository.save(fProfile);
+            }
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+            String token = jwtUtil.generateToken(userDetails, user.getRole().name());
+            return new AuthResponse(token, user.getUsername(), user.getRole().name());
+        } catch (IllegalArgumentException ex) {
+            throw new RuntimeException("Invalid role selected.");
+        } catch (DataIntegrityViolationException ex) {
+            throw new RuntimeException("Registration failed because the provided data conflicts with an existing record.");
         }
-
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
-        String token = jwtUtil.generateToken(userDetails, user.getRole().name());
-        return new AuthResponse(token, user.getUsername(), user.getRole().name());
     }
 
     private void ensureRoleProfileExists(User user) {
