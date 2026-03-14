@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -31,7 +32,7 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173,https://*.vercel.app}")
     private String allowedOrigins;
 
     @Bean
@@ -57,16 +58,42 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+        List<String> configuredOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
+                .map(this::normalizeOrigin)
                 .filter(origin -> !origin.isBlank())
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
+
+        List<String> exactOrigins = new ArrayList<>();
+        List<String> originPatterns = new ArrayList<>();
+        for (String origin : configuredOrigins) {
+            if (origin.contains("*")) {
+                originPatterns.add(origin);
+            } else {
+                exactOrigins.add(origin);
+            }
+        }
+
+        config.setAllowedOrigins(exactOrigins);
+        config.setAllowedOriginPatterns(originPatterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Authorization", "Content-Type"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private String normalizeOrigin(String origin) {
+        if (origin == null) {
+            return "";
+        }
+        String trimmed = origin.trim();
+        if (trimmed.endsWith("/")) {
+            return trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 
     @Bean
