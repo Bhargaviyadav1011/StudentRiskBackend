@@ -32,3 +32,13 @@ If Render is configured as a Docker service, this repo now includes a `Dockerfil
 - `OPENROUTER_API_URL`
 - `SPRING_JPA_HIBERNATE_DDL_AUTO`
 - `JWT_EXPIRATION`
+
+## PostgreSQL on Render
+
+If you are using Render PostgreSQL, set:
+
+- `SPRING_DATASOURCE_URL=jdbc:postgresql://HOST:5432/DATABASE`
+- `SPRING_DATASOURCE_USERNAME=YOUR_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD=YOUR_PASSWORD`
+
+Do not enter `${SPRING_DATASOURCE_URL}` as the value in Render. Enter the real JDBC URL.
